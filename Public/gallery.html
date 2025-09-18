@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Galleria</title>
+    <style>
+        :root {
+            --bg: #0f1115;
+            --fg: #e8eaed;
+            --muted: #c8cbd0;
+            --accent: #ff9fc1;
+            --maxw: 1200px;
+            --gap: 14px;
+            --radius: 14px;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html, body {
+            height: 100%
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            backdrop-filter: saturate(160%) blur(8px);
+            background: rgba(15,17,21,.7);
+            border-bottom: 1px solid rgba(255,255,255,.07);
+        }
+
+        .head-inner {
+            max-width: var(--maxw);
+            margin: 0 auto;
+            padding: 20px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: space-between;
+        }
+
+        .back {
+            color: var(--fg);
+            text-decoration: none;
+            font-weight: 700;
+            opacity: .85
+        }
+
+        .title {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 800;
+            letter-spacing: .3px
+        }
+
+        main {
+            max-width: var(--maxw);
+            margin: 0 auto;
+            padding: 16px
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--gap);
+        }
+
+        .card {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: #000;
+            aspect-ratio: 4 / 3;
+            box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 8px 24px rgba(0,0,0,.35);
+        }
+
+            .card img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+                transition: transform .35s ease, filter .3s ease;
+                will-change: transform, filter;
+                filter: saturate(1) brightness(.98);
+            }
+
+            .card:hover img {
+                transform: scale(1.02);
+                filter: saturate(1.05) brightness(1.02);
+            }
+
+        .empty, .error {
+            color: var(--muted);
+            text-align: center;
+            padding: 40px 12px;
+        }
+
+        /* Lightbox */
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+            .lightbox.open {
+                display: flex;
+            }
+
+        .lb-img {
+            max-width: min(96vw, 1400px);
+            max-height: 92vh;
+            border-radius: 12px;
+            object-fit: contain;
+            box-shadow: 0 10px 28px rgba(0,0,0,.0);
+        }
+
+        .lb-ui {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        .lb-btn {
+            pointer-events: auto;
+            background: rgba(255,255,255,.0);
+            border: 1px solid rgba(255,255,255,.0);
+            width: 68px;
+            height: 68px;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            transition: transform .1s ease, background .2s ease;
+        }
+
+            .lb-btn:hover {
+                background: rgba(255,255,255,.0);
+            }
+
+            .lb-btn:active {
+                transform: scale(.9)
+            }
+
+        .lb-close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+        }
+
+        /* Helpers */
+        .sr-only {
+            position: absolute;
+            left: -10000px;
+            top: auto;
+            width: 1px;
+            height: 1px;
+            overflow: hidden
+        }
+
+        @media (max-width: 640px) {
+            .empty, .error {
+                padding: 10px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="head-inner">
+            <a class="back" href="HomePage.html">← Indietro</a>
+            <h1 class="title" id="galleryTitle">Galleria</h1>
+        </div>
+    </header>
+
+    <main>
+        <div id="status" class="empty">Caricamento…</div>
+        <div id="grid" class="grid" hidden></div>
+    </main>
+
+    <!-- Lightbox -->
+    <div id="lightbox" class="lightbox" aria-modal="true" role="dialog">
+        <button id="lbClose" class="lb-btn lb-close" aria-label="Chiudi">✕</button>
+        <div class="lb-ui">
+            <button id="lbPrev" class="lb-btn" aria-label="Precedente">‹</button>
+            <button id="lbNext" class="lb-btn" aria-label="Successiva">›</button>
+        </div>
+        <img id="lbImg" class="lb-img" alt="">
+        <span class="sr-only" id="lbCounter"></span>
+    </div>
+
+    <script type="module">
+        // Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+        // --- Firebase config ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCkO9zQf8Dx5M3db8RpH35o3-vUz16R6mk",
+            authDomain: "aluxbysolar23.firebaseapp.com",
+            projectId: "aluxbysolar23",
+            storageBucket: "aluxbysolar23.firebasestorage.app",
+            messagingSenderId: "978969467398",
+            appId: "1:978969467398:web:7da4c402084ef920b58187"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // --- Helpers ---
+        const params = new URLSearchParams(location.search);
+        const slug = params.get('g');
+
+        const statusEl = document.getElementById('status');
+        const gridEl = document.getElementById('grid');
+        const titleEl = document.getElementById('galleryTitle');
+
+        let urls = [], cur = 0;
+
+        function showError(msg) {
+            statusEl.textContent = msg;
+            statusEl.className = 'error';
+            gridEl.hidden = true;
+        }
+        function clearStatus() {
+            statusEl.textContent = '';
+            statusEl.className = 'empty';
+            gridEl.hidden = false;
+        }
+        function isAbsoluteUrl(v) {
+            return typeof v === 'string' && /^(?:https?:)?\/\//i.test(v);
+        }
+        function joinPath(base, name) {
+            if (!base) return name;
+            if (base.endsWith('/') || name.startsWith('/')) return base + name;
+            return base + '/' + name;
+        }
+        function normalizeItems(items, basePath) {
+            const base = (basePath || '').trim();
+            return (items || [])
+                .map(it => {
+                    // Supporta: stringhe o oggetti { url, id }
+                    if (typeof it === 'string') {
+                        return isAbsoluteUrl(it) ? it : (base ? joinPath(base, it) : it);
+                    }
+                    if (it && typeof it.url === 'string' && it.url) {
+                        return it.url; // Cloudinary URL
+                    }
+                    return '';
+                })
+                .filter(Boolean);
+        }
+
+        // --- Render Grid ---
+        function renderGrid() {
+            gridEl.innerHTML = '';
+            urls.forEach((src, i) => {
+                const card = document.createElement('a');
+                card.href = '#';
+                card.className = 'card';
+                card.dataset.index = i;
+                card.innerHTML = `<img loading="lazy" alt="" src="${src}">`;
+                card.addEventListener('click', (e) => { e.preventDefault(); openLightbox(i); });
+                gridEl.appendChild(card);
+            });
+        }
+
+        // --- Lightbox ---
+        const lb = document.getElementById('lightbox');
+        const lbImg = document.getElementById('lbImg');
+        const lbClose = document.getElementById('lbClose');
+        const lbPrev = document.getElementById('lbPrev');
+        const lbNext = document.getElementById('lbNext');
+        const lbCounter = document.getElementById('lbCounter');
+
+        function openLightbox(index) {
+            cur = index;
+            updateLB();
+            lb.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeLightbox() {
+            lb.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+        function updateLB() {
+            lbImg.src = urls[cur];
+            lbCounter.textContent = `Immagine ${cur + 1} di ${urls.length}`;
+            // Preload next/prev
+            if (urls.length > 1) {
+                const n1 = new Image(); n1.src = urls[(cur + 1) % urls.length];
+                const p1 = new Image(); p1.src = urls[(cur - 1 + urls.length) % urls.length];
+            }
+        }
+        function next() { if (urls.length) { cur = (cur + 1) % urls.length; updateLB(); } }
+        function prev() { if (urls.length) { cur = (cur - 1 + urls.length) % urls.length; updateLB(); } }
+
+        lbClose.addEventListener('click', closeLightbox);
+        lbNext.addEventListener('click', next);
+        lbPrev.addEventListener('click', prev);
+        lb.addEventListener('click', (e) => { if (e.target === lb) closeLightbox(); });
+        window.addEventListener('keydown', (e) => {
+            if (!lb.classList.contains('open')) return;
+            if (e.key === 'Escape') closeLightbox();
+            else if (e.key === 'ArrowRight') next();
+            else if (e.key === 'ArrowLeft') prev();
+        });
+
+        // --- Init ---
+        (async function init() {
+            if (!slug) { showError('Nessuna galleria selezionata.'); return; }
+            try {
+                const ref = doc(db, "galleries", slug);
+                const snap = await getDoc(ref);
+                if (!snap.exists()) { showError('Galleria non trovata.'); return; }
+
+                const data = snap.data();
+                titleEl.textContent = data.title || 'Galleria';
+
+                // Normalizza gli items (stringhe o oggetti {url,id}), con supporto a basePath opzionale
+                urls = normalizeItems(data.items, data.basePath);
+
+                if (!urls.length) { showError('Questa galleria è vuota.'); return; }
+                clearStatus();
+                renderGrid();
+            } catch (err) {
+                console.error(err);
+                showError('Errore nel caricamento della galleria.');
+            }
+        })();
+    </script>
+</body>
+</html>

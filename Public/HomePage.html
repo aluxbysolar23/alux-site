@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>A LUX BY SOLAR • Carousel unified</title>
+<style>
+  :root{
+    --bg:#0f1115; --fg:#e8eaed; --muted:#c8cbd0;
+    --r:18px;
+    --base-w:1200px; --base-h:420px;
+    --nav-h:75px; --footer-h:84px; --page-max:1200px;
+    --gap:16px; --slide-w:600px; --edge-fade:72px;
+    --scale-center:1.0; --scale-edge:0.88; --blur-max:2.5px;
+    --parallax:80; --img-overscan:140%;
+    --accent:#ff9fc1; --cta-bg: rgba(255,255,255,.06); --cta-border: rgba(255,255,255,.18); --cta-text:#e8eaed;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{ margin:0; background:var(--bg); color:var(--fg);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    overflow:hidden; padding-bottom: var(--footer-h);
+  }
+
+  /* NAVBAR (on top of everything) */
+  .navbar{ position:sticky; top:0; z-index:1000; height:var(--nav-h);
+    backdrop-filter:saturate(160%) blur(8px); background:rgba(15,17,21,.72);
+    border-bottom:1px solid rgba(255,255,255,.07);
+  }
+  .nav-inner{ height:100%; max-width:var(--page-max); margin:0 auto; padding:0 16px;
+    display:grid; grid-template-columns: 1fr auto 1fr; align-items:center; gap:12px; }
+  .nav-left{ justify-self:start; display:flex; align-items:center; }
+  .nav-right{ justify-self:end; display:flex; align-items:center; position:relative; }
+  .logo { width:38px; height:38px; border-radius:999px;
+    background: radial-gradient(circle at 50% 50%, #ffffff 0 28%, #0f1115 30% 100%);
+    box-shadow: 0 0 0 2px rgba(255,255,255,.08), 0 4px 10px rgba(0,0,0,.5);
+    justify-self:center;
+  }
+  .icon-btn{ width:66px; height:66px; border:none; border-radius:999px;
+    display:grid; place-items:center; cursor:pointer; background:transparent; color:var(--fg);
+    transition:background .2s ease, transform .08s ease;
+  }
+  .icon-btn svg{ width:30px; height:30px; }
+  .icon-btn:hover{ background:rgba(255,255,255,.08); }
+  .icon-btn:active{ transform:scale(.96); }
+  .menu-panel{ display:none; position:absolute; top:calc(var(--nav-h) + 8px); right:0; width:220px; padding:8px;
+    border-radius:14px; background:rgba(15,17,21,.96); border:1px solid rgba(255,255,255,.08);
+    box-shadow:0 12px 32px rgba(0,0,0,.5); z-index:1001; }
+
+  .viewport{ height: calc(100vh - var(--nav-h) - var(--footer-h));
+    display:grid; align-content:center; justify-items:center; padding: 8px 0; position: relative;
+  }
+  .page-title{ position: absolute; top: calc((100% - var(--base-h)) * 0.25); left: 50%;
+    transform: translateX(-50%); margin: 0; text-align: center;
+    font-size: clamp(20px, 3vw, 28px); font-weight:700; letter-spacing:.5px; pointer-events: none;
+  }
+  .stage{ position:relative; width: min(100vw, var(--page-max)); height: var(--base-h);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, black var(--edge-fade), black calc(100% - var(--edge-fade)), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, black var(--edge-fade), black calc(100% - var(--edge-fade)), transparent 100%);
+    overflow: visible; margin-top: 120px; z-index: 1;
+  }
+  .scene{ position:absolute; left:50%; top:50%; width: var(--base-w); height: var(--base-h);
+    transform: translate(-50%,-50%) scale(1); transform-origin:center; }
+
+  /* Slideshow: fully JS-driven, no native snap */
+  .slideshow{ position:absolute; inset:0; display:flex; align-items:center; gap:var(--gap);
+    padding-inline: calc((var(--base-w) - var(--slide-w)) / 2);
+    overflow-x:auto; overflow-y:visible; cursor:grab;
+    -webkit-overflow-scrolling:touch; touch-action:none; user-select:none;
+  }
+  .slideshow.dragging{ cursor:grabbing; }
+  .slideshow::-webkit-scrollbar{ display:none; }
+
+  .slide{ position:relative; flex: 0 0 var(--slide-w); height: 100%; overflow: visible;
+    will-change: transform, filter, opacity; z-index:1; }
+
+  .card{ position:absolute; inset:0; border-radius: calc(var(--r) - 6px); overflow:hidden; background:#000; z-index:2; }
+  .media{ position:absolute; inset:0; overflow:hidden; }
+  .media img{ width:100%; height:100%; object-fit:cover; display:block; transform: translateX(0) scale(1); will-change: transform; }
+
+  .caption{ margin-top: 60px; text-align:center }
+  #captionLink{ --p: 16px; display:inline-flex; align-items:center; gap:12px; padding:12px var(--p);
+    border-radius:999px; color:var(--cta-text); text-decoration:none; font-weight:750; letter-spacing:.2px;
+    background: var(--cta-bg); border:1px solid var(--cta-border); backdrop-filter: blur(10px) saturate(140%);
+    box-shadow: 0 8px 24px rgba(0,0,0,.35), 0 2px 0 rgba(255,255,255,.06) inset;
+    transition: transform .18s ease, box-shadow .2s ease, letter-spacing .18s ease; position:relative; overflow:hidden;
+  }
+  #captionLink .txt{ display:flex; flex-direction:column; align-items:flex-start; line-height:1.06; }
+  #captionLink .title{ font-size: 1.15rem; font-weight:800; }
+  #captionLink .sub{ font-size:.76rem; opacity:.85; margin-top:2px; font-weight:700; }
+  #captionLink .chev{ width:18px; height:18px; flex:0 0 18px; transition: transform .18s ease, opacity .18s ease; opacity:.9; }
+
+  footer{ position:fixed; left:0; right:0; bottom:0; z-index:40; height:var(--footer-h);
+    background:rgba(15,17,21,.72); backdrop-filter:saturate(140%) blur(6px);
+    border-top:1px solid rgba(255,255,255,.07); color:var(--muted);
+  }
+  .footer-inner{ height:100%; max-width: var(--page-max); margin: 0 auto; padding: 0 16px;
+    display: grid; align-items: center; justify-content: center; justify-items:center; }
+  .social{ display:flex; gap:75px }
+  .social a{ width:52px;height:52px;border-radius:999px;display:grid;place-items:center;color:var(--fg);text-decoration:none;background:rgba(255,255,255,.08);transition:background .2s,transform .08s }
+  .social a:hover{ background:rgba(255,255,255,.16) } .social a:active{ transform:scale(.95) }
+
+  @media (max-width: 640px){
+    :root{ --base-w: 900px; --base-h: 490px; --slide-w: 650px; --edge-fade: 48px; }
+    .stage{ width:100vw; height: 255px; margin-bottom: 0px; margin-top: 0px; }
+    .page-title{ top: calc((100% - var(--base-h)) * 0.22); }
+    .page-title{ top: calc((100% - var(--base-h)) * 0.22); }
+    .caption {
+        margin-bottom: 80px;
+        margin-top: 30px;
+    }
+  }
+
+  /* Soft glowing orbs background */
+  #bgOrbs{
+    position:absolute; inset:0; z-index:0;
+    display:block; width:100%; height:100%;
+    background: transparent;
+    pointer-events:none;
+  }
+
+
+  /* Subtle glow orbs background (non-intrusive) */
+  .viewport { position: relative; }
+  #bgOrbs {
+    position:absolute; inset:0; z-index:0;
+    display:block; width:100%; height:100%;
+    pointer-events:none; /* never block interactions */
+  }
+
+</style>
+</head>
+<body>
+    <nav class="navbar" aria-label="Primary">
+        <div class="nav-inner">
+            <div class="nav-left">
+                <a href="shop.html"
+        <button class="icon-btn" aria-label="Shop">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 7h12l-1 12H7L6 7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M9 7a3 3 0 0 1 6 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+          </a>
+            </div>
+            <div class="logo" title="Brand"></div>
+            <div class="nav-right">
+                <button class="icon-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="menuPanel" aria-label="More">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    </svg>
+                </button>
+                <div id="menuPanel" class="menu-panel" role="menu" aria-label="Menu">
+                    <a class="menu-item" href="#about" role="menuitem" style="display:block;padding:10px;border-radius:10px;color:var(--fg);text-decoration:none">About</a>
+                    <a class="menu-item" href="#works" role="menuitem" style="display:block;padding:10px;border-radius:10px;color:var(--fg);text-decoration:none">Works</a>
+                    <a class="menu-item" href="#contact" role="menuitem" style="display:block;padding:10px;border-radius:10px;color:var(--fg);text-decoration:none">Contact</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="viewport">
+        <canvas id="bgOrbs" aria-hidden="true"></canvas>
+        <h1 class="page-title">A LUX BY SOLAR</h1>
+        <div class="stage" id="stage">
+            <div class="scene" id="scene">
+                <div class="slideshow" id="slideshow" aria-roledescription="carousel"></div>
+            </div>
+        </div>
+        <div class="caption">
+            <a id="captionLink" href="#">Titolo</a>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-inner">
+            <div class="social">
+                <a href="https://www.instagram.com/lux.paskal" aria-label="Instagram">IG</a>
+                <a href="#" aria-label="X">X</a>
+                <a href="mailto:hello@example.com" aria-label="Email">✉</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        /* ===== DATA ===== */
+        // Popolato dinamicamente da Firestore
+        let items = [];
+
+        const stage = document.getElementById('stage');
+        const scene = document.getElementById('scene');
+        const scroller = document.getElementById('slideshow');
+        const captionLink = document.getElementById('captionLink');
+        const menuBtn = document.getElementById('menuBtn');
+        const menuPanel = document.getElementById('menuPanel');
+
+        // Quante volte duplicare l'array originale per allungare il loop.
+        // 9 copie ≈ 4 giri completi prima del riciclo; imposta a 4 se vuoi 4 copie totali.
+        const COPIES = 9;
+        const MID_GROUP = Math.floor(COPIES / 2);
+        /* MENU */
+        menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = menuPanel.style.display !== 'block';
+            menuPanel.style.display = open ? 'block' : 'none';
+            menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        document.addEventListener('click', (e) => {
+            if (menuPanel.style.display === 'block' && !menuPanel.contains(e.target) && e.target !== menuBtn) {
+                menuPanel.style.display = 'none';
+                menuBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        /* ===== Build track with clones (infinite) ===== */
+        function makeSlide(item, baseIndex, group) {
+            const slide = document.createElement('div');
+            slide.className = 'slide';
+            slide.dataset.baseIndex = baseIndex;
+            slide.dataset.group = group;
+            slide.innerHTML = `
+        <div class="card">
+          <div class="media">
+            <img src="${item.src}" alt="${item.title}" draggable="false" decoding="async" loading="lazy">
+          </div>
+        </div>`;
+            return slide;
+        }
+        function buildTrack() {
+            scroller.innerHTML = '';
+            for (let g = 0; g < COPIES; g++) {
+                items.forEach((it, i) => scroller.appendChild(makeSlide(it, i, String(g))));
+            }
+        }
+        let slides = [];
+        let imgs = [];
+
+        function css(el) { return getComputedStyle(el); }
+        function getGap() { return parseFloat(css(scroller).gap || 0); }
+        function padLeft() { return parseFloat(css(scroller).paddingLeft) || 0; }
+        function slideWidth() { return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--slide-w')); }
+        function slideFullWidth() { return slideWidth() + getGap(); }
+
+        function computeScale() {
+            const rs = getComputedStyle(document.documentElement);
+            const baseW = parseFloat(rs.getPropertyValue('--base-w'));
+            const baseH = parseFloat(rs.getPropertyValue('--base-h'));
+            const w = stage.clientWidth, h = stage.clientHeight;
+            return Math.min(w / baseW, h / baseH);
+        }
+        function applyScale() {
+            const s = computeScale();
+            scene.style.transform = `translate(-50%,-50%) scale(${s})`;
+        }
+        applyScale();
+        window.addEventListener('resize', () => { applyScale(); requestUpdate(); normalizeToMiddleIfNeeded(); });
+
+        /* ===== Effects ===== */
+        const rs = getComputedStyle(document.documentElement);
+        const SCALE_CENTER = parseFloat(rs.getPropertyValue('--scale-center')) || 1.06;
+        const SCALE_EDGE = parseFloat(rs.getPropertyValue('--scale-edge')) || 0.88;
+        const BLUR_MAX_PX = parseFloat(rs.getPropertyValue('--blur-max')) || 1;
+        const PARALLAX_PX = parseFloat(rs.getPropertyValue('--parallax')) || 80;
+        const IMG_COMP_BLEND = 0.6;
+        const IMG_BASE_SCALE = 1.18; // overscan per evitare bande nere con parallax
+
+        function virtualIndex() { return Math.round(scroller.scrollLeft / slideFullWidth()); }
+        function realIndexFromVirtual(v) { const N = items.length; return ((v - N) % N + N) % N; }
+
+        function updateCaption() {
+            const r = realIndexFromVirtual(virtualIndex());
+            const it = items[r] || { title: '', slug: '' };
+            captionLink.href = "gallery.html?g=" + (it.slug || '');
+
+
+            //const r = realIndexFromVirtual( virtualIndex() );
+            //const it = items[r];
+            //captionLink.href = it.href;
+            captionLink.setAttribute('aria-label', `Apri la galleria ${it.title}`);
+            captionLink.innerHTML = `
+        <div class="txt">
+          <span class="title">${it.title}</span>
+          <span class="sub">Apri galleria</span>
+        </div>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M5 12h12M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
+        }
+
+        /* Helpers */
+        function centeredSlide() {
+            const centerX = scroller.scrollLeft + scroller.clientWidth / 2;
+            let best = null, bestDist = Infinity;
+            slides.forEach(sl => {
+                const cx = sl.offsetLeft + sl.offsetWidth / 2;
+                const d = Math.abs(cx - centerX);
+                if (d < bestDist) { best = sl; bestDist = d; }
+            });
+            return best;
+        }
+        function leftForSlide(slide) {
+            if (!slide) return 0;
+            return slide.offsetLeft - (scroller.clientWidth - slide.offsetWidth) / 2;
+        }
+        function normalizeToMiddleIfNeeded() {
+            const sl = centeredSlide(); if (!sl) return;
+            const g = parseInt(sl.dataset.group, 10);
+            if (g > 0 && g < COPIES - 1) return; // ricentra solo quando siamo agli estremi
+            const target = scroller.querySelector(`.slide[data-group="${MID_GROUP}"][data-base-index="${sl.dataset.baseIndex}"]`);
+            if (!target) return;
+            scroller.scrollLeft = leftForSlide(target);
+        }
+
+        /* Scroll effects */
+        let ticking = false;
+        function updateEffects() {
+            if (!slides.length || !imgs.length) { ticking = false; return; }
+            ticking = false;
+            const wSlide = slideWidth(), wFull = slideFullWidth();
+            const vCenter = scroller.scrollLeft + scroller.clientWidth / 2;
+            const pLeft = padLeft();
+            const slidesArr = slides, imgsArr = imgs;
+
+            const vIdx = Math.round(scroller.scrollLeft / wFull);
+            const centerIdx = Math.max(0, Math.min(slidesArr.length - 1, vIdx));
+
+            slidesArr.forEach((slide, i) => {
+                const sCenter = pLeft + i * wFull + wSlide / 2;
+                const delta = Math.abs(vCenter - sCenter);
+                const t = Math.min(1, delta / wFull);
+                const signed = (vCenter - sCenter) / wFull;
+
+                const cardScale = SCALE_EDGE + (1 - t) * (SCALE_CENTER - SCALE_EDGE);
+                slide.style.transform = `scale(${cardScale})`;
+                const blur = t * BLUR_MAX_PX;
+                const opacity = 0.9 + (1 - t) * 0.1;
+                slide.style.filter = `blur(${blur}px) saturate(${0.9 + (1 - t) * 0.2})`;
+                slide.style.opacity = opacity;
+
+                const shiftX = -signed * PARALLAX_PX;
+                const fullComp = 1 / cardScale;
+                const imgCompScale = 1 + (fullComp - 1) * IMG_COMP_BLEND;
+                imgsArr[i].style.transform = `translateX(${shiftX}px) scale(${IMG_BASE_SCALE * imgCompScale})`;
+
+                slide.style.zIndex = (i === centerIdx ? 1000 : 1);
+            });
+
+            updateCaption();
+        }
+        function requestUpdate() { if (!ticking) { ticking = true; requestAnimationFrame(updateEffects); } }
+        scroller.addEventListener('scroll', requestUpdate, { passive: true });
+
+        // garantisce gesture gestite via JS su mobile
+        scroller.style.touchAction = 'none';
+
+        /* ===== Unified animation easing ===== */
+        function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+        let animId = null;
+        function animateTo(leftTarget, dur = 420) {
+            if (animId) cancelAnimationFrame(animId);
+            const start = scroller.scrollLeft, dist = leftTarget - start, t0 = performance.now();
+            function step(now) {
+                const p = Math.min(1, (now - t0) / dur), e = easeOutCubic(p);
+                scroller.scrollLeft = start + dist * e; requestUpdate();
+                if (p < 1) animId = requestAnimationFrame(step);
+                else { animId = null; normalizeToMiddleIfNeeded(); requestUpdate(); }
+            }
+            animId = requestAnimationFrame(step);
+        }
+
+        /* ===== Drag (mouse/pen/touch) + fling ===== */
+        let dragging = false, pid = null, startX = 0, startLeft = 0, lastX = 0, lastT = 0, vx = 0, moved = false, isTouch = false;
+        let startIndexAtDown = 0;
+        const FLING_VEL = 2000000;   // px/ms
+        const MIN_DRAG_MOUSE = 5;      // px
+        const MIN_DRAG_TOUCH = 0.4;      // px (più sensibile su smartphone)
+        const INERTIA_MOUSE = 180;     // proiezione inerziale desktop
+        const INERTIA_TOUCH = 2060;     // proiezione più lunga su smartphone (avanza con gesto corto)
+        function onPointerDown(e) {
+            isTouch = (e.pointerType === 'touch');
+            isTouch = (e.pointerType === 'touch');
+            dragging = true; moved = false; pid = e.pointerId;
+            scroller.setPointerCapture(pid || 1);
+            scroller.classList.add('dragging');
+            if (animId) { cancelAnimationFrame(animId); animId = null; }
+            const x = (e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0].clientX)) || 0;
+            startX = lastX = x;
+            startLeft = scroller.scrollLeft;
+            lastT = performance.now();
+            // memorizza indice di partenza per evitare salti multipli
+            startIndexAtDown = Math.round(scroller.scrollLeft / slideFullWidth());
+        }
+        function onPointerMove(e) {
+            if (!dragging) return;
+            const x = (e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0].clientX)) || lastX;
+            const now = performance.now();
+            const dx = x - lastX;
+            const dt = Math.max(1, now - lastT);
+            vx = dx / dt;
+            lastX = x; lastT = now;
+
+            const totalDx = x - startX;
+            const MIN_DRAG = isTouch ? MIN_DRAG_TOUCH : MIN_DRAG_MOUSE;
+            if (Math.abs(totalDx) > MIN_DRAG) moved = true;
+
+            e.preventDefault();
+            scroller.scrollLeft = startLeft - totalDx;
+            requestUpdate();
+        }
+
+
+        function onPointerUp() {
+            if (!slides.length) return;
+            if (!dragging) return;
+            dragging = false; pid = null; scroller.classList.remove('dragging');
+
+            const w = slideFullWidth();
+            // indice iniziale registrato al down
+            const currentIndex = startIndexAtDown;
+            const deltaX = (lastX - startX);
+
+            let dir = 0;
+            // Inverti la mappatura: swipe L→R (vx/deltaX > 0) => vai a sinistra (dir = -1),
+            // swipe R→L (vx/deltaX < 0) => vai a destra (dir = +1).
+            const s = (Math.abs(vx) > 2) ? vx : deltaX;
+            if (s > 0) dir = -1;
+            else if (s < 0) dir = 1;
+            else dir = 0;
+
+            const targetIndex = currentIndex + Math.max(-1, Math.min(1, dir));
+
+            const approxLeft = targetIndex * w;
+            let best = slides[0], bestDist = Infinity;
+            slides.forEach(sl => {
+                const l = leftForSlide(sl);
+                const d = Math.abs(l - approxLeft);
+                if (d < bestDist) { best = sl; bestDist = d; }
+            });
+
+            animateTo(leftForSlide(best), 420);
+        }
+
+        /* Pointer events with fallbacks */
+        if ('PointerEvent' in window) {
+            scroller.addEventListener('pointerdown', onPointerDown);
+            scroller.addEventListener('pointermove', onPointerMove, { passive: false });
+            scroller.addEventListener('pointerup', onPointerUp);
+            scroller.addEventListener('pointercancel', onPointerUp);
+            scroller.addEventListener('lostpointercapture', onPointerUp);
+        } else {
+            scroller.addEventListener('mousedown', (e) => onPointerDown(e));
+            window.addEventListener('mousemove', (e) => { if (dragging) onPointerMove(e); }, { passive: false });
+            window.addEventListener('mouseup', onPointerUp);
+            scroller.addEventListener('touchstart', (e) => onPointerDown(e.touches[0]), { passive: true });
+            scroller.addEventListener('touchmove', onPointerMove, { passive: false });
+            scroller.addEventListener('touchend', onPointerUp);
+        }
+
+        /* Click/Tap on blurred slide -> center with same animation */
+
+        scroller.addEventListener('click', (e) => {
+            if (!slides.length) return;
+            if (dragging || animId) return;
+            const slideEl = e.target.closest('.slide');
+            if (!slideEl) {
+                // Click sui lati dello scroller: sinistra = -1, destra = +1
+                const rect = scroller.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const dir = (x < rect.width * 0.5) ? -1 : 1; // metà sinistra/destra
+                const w = slideFullWidth();
+                const currentIndex = Math.round(scroller.scrollLeft / w);
+                const targetIndex = currentIndex + dir;
+
+                const approxLeft = targetIndex * w;
+                let best = slides[0], bestDist = Infinity;
+                slides.forEach(sl => {
+                    const l = leftForSlide(sl);
+                    const d = Math.abs(l - approxLeft);
+                    if (d < bestDist) { best = sl; bestDist = d; }
+                });
+                animateTo(leftForSlide(best), 420);
+                return;
+            }
+            const curCenter = scroller.scrollLeft + scroller.clientWidth / 2;
+            const slCenter = slideEl.offsetLeft + slideEl.offsetWidth / 2;
+            if (Math.abs(curCenter - slCenter) < 2) return;
+            animateTo(leftForSlide(slideEl), 420);
+        });
+        /* Init */
+        function jumpToMiddleByIndex(baseIndex) {
+            const target = scroller.querySelector(`.slide[data-group="${MID_GROUP}"][data-base-index="${baseIndex}"]`);
+            if (!target) return;
+            scroller.scrollLeft = leftForSlide(target);
+        }
+        function init() {
+            jumpToMiddleByIndex(0);
+            applyScale();
+            requestUpdate();
+        }
+
+    </script>
+
+    <script>
+        // === Soft Glowing Orbs Background ===
+        (function () {
+            const canvas = document.getElementById('bgOrbs');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            let dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+            function resize() {
+                canvas.width = Math.floor(canvas.clientWidth * dpr);
+                canvas.height = Math.floor(canvas.clientHeight * dpr);
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            const isMobile = matchMedia('(max-width: 640px)').matches;
+            const orbCount = isMobile ? 3 : 6;
+            const orbs = [];
+            function rnd(a, b) { return Math.random() * (b - a) + a }
+            for (let i = 0; i < orbCount; i++) {
+                const r = rnd(120, 260);
+                orbs.push({
+                    x: rnd(0, canvas.clientWidth),
+                    y: rnd(0, canvas.clientHeight),
+                    r,
+                    vx: rnd(-0.05, 0.05),
+                    vy: rnd(-0.05, 0.05),
+                    hue: rnd(0, 360)
+                });
+            }
+
+            function loop() {
+                ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+                for (const o of orbs) {
+                    o.x += o.vx; o.y += o.vy;
+                    if (o.x < -o.r) o.x = canvas.clientWidth + o.r;
+                    if (o.x > canvas.clientWidth + o.r) o.x = -o.r;
+                    if (o.y < -o.r) o.y = canvas.clientHeight + o.r;
+                    if (o.y > canvas.clientHeight + o.r) o.y = -o.r;
+
+                    const grad = ctx.createRadialGradient(o.x, o.y, o.r * 0.1, o.x, o.y, o.r);
+                    grad.addColorStop(0, `hsla(${o.hue},80%,70%,0.25)`);
+                    grad.addColorStop(1, `hsla(${o.hue},80%,70%,0)`);
+
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                requestAnimationFrame(loop);
+            }
+            loop();
+        })();
+    </script>
+
+
+
+
+
+    <script>
+        // ===== Glow Orbs (simple slow drift, less blur) =====
+        (function () {
+            const canvas = document.getElementById('bgOrbs');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            let dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+            function resize() {
+                const w = canvas.clientWidth, h = canvas.clientHeight;
+                canvas.width = Math.floor(w * dpr);
+                canvas.height = Math.floor(h * dpr);
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
+            const ro = new ResizeObserver(resize);
+            ro.observe(canvas);
+            resize();
+
+            const isMobile = matchMedia('(max-width: 640px)').matches;
+            const ORB_COUNT = isMobile ? 6 : 9;
+            const R_MIN = isMobile ? 80 : 120;
+            const R_MAX = isMobile ? 110 : 140;
+            const SPEED = isMobile ? 6 : 10;
+            const ALPHA = 0.95;
+            const HUE = 335;
+            const SATURATION = 25;
+
+            const orbs = [];
+            function rnd(a, b) { return Math.random() * (b - a) + a }
+            function spawn() {
+                orbs.length = 0;
+                const W = canvas.clientWidth, H = canvas.clientHeight;
+                for (let i = 0; i < ORB_COUNT; i++) {
+                    const r = rnd(R_MIN, R_MAX);
+                    const angle = rnd(0, Math.PI * 2);
+                    const speed = rnd(0.3, 1) * SPEED;
+                    orbs.push({
+                        x: rnd(0, W),
+                        y: rnd(0, H),
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        r,
+                        hue: HUE + rnd(-8, 8)
+                    });
+                }
+            }
+            spawn();
+
+            let last = performance.now();
+            function loop(now) {
+                const dt = Math.min(0.05, (now - last) / 1000); last = now;
+                ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+                ctx.globalCompositeOperation = 'lighter';
+
+                for (const o of orbs) {
+                    o.x += o.vx * dt;
+                    o.y += o.vy * dt;
+
+                    const W = canvas.clientWidth, H = canvas.clientHeight;
+                    if (o.x < -o.r) o.x = W + o.r;
+                    if (o.x > W + o.r) o.x = -o.r;
+                    if (o.y < -o.r) o.y = H + o.r;
+                    if (o.y > H + o.r) o.y = -o.r;
+
+                    const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
+                    grad.addColorStop(0.0, `hsla(${o.hue}, ${SATURATION}%, 75%, ${ALPHA})`);
+                    grad.addColorStop(0.5, `hsla(${o.hue}, ${SATURATION}%, 65%, ${ALPHA * 0.4})`);
+                    grad.addColorStop(1.0, `hsla(${o.hue}, ${SATURATION}%, 55%, 0)`);
+
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.globalCompositeOperation = 'source-over';
+                requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+
+            let to;
+            window.addEventListener('resize', () => {
+                clearTimeout(to); to = setTimeout(() => { resize(); spawn(); }, 150);
+            });
+        })();
+    </script>
+
+
+    <script>
+        // ===== Subtle Glow Orbs (fewer blur, slow autonomous drift; no pointer) =====
+        (function () {
+            const canvas = document.getElementById('bgOrbs');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            let dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+            function resize() {
+                const w = canvas.clientWidth, h = canvas.clientHeight;
+                canvas.width = Math.floor(w * dpr);
+                canvas.height = Math.floor(h * dpr);
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
+            const ro = new ResizeObserver(resize);
+            ro.observe(canvas);
+            resize();
+
+            const isMobile = matchMedia('(max-width: 640px)').matches;
+            const ORB_COUNT = isMobile ? 60 : 165;       // few orbs
+            const R_MIN = isMobile ? 2 : 3;        // radius range (slightly larger core)
+            const R_MAX = isMobile ? 7 : 9;
+            const SPEED = isMobile ? 20 : 30;           // slow drift (px/s)
+            const ALPHA = isMobile ? 0.65 : 0.4;                       // overall glow intensity (lower = less blur/bleed)
+            const HUE = 335;                          // soft pink (set SATURATION=0 for white)
+            const SATURATION = 0;                    // lower saturation for subtle color
+
+            const orbs = [];
+            function rnd(a, b) { return Math.random() * (b - a) + a }
+
+            function spawn() {
+                orbs.length = 0;
+                const W = canvas.clientWidth, H = canvas.clientHeight;
+                for (let i = 0; i < ORB_COUNT; i++) {
+                    const r = rnd(R_MIN, R_MAX);
+                    const angle = rnd(0, Math.PI * 2);
+                    const speed = rnd(0.25, 0.8) * SPEED; // autonomous, very slow
+                    orbs.push({
+                        x: rnd(-0.1 * W, 1.1 * W),
+                        y: rnd(-0.1 * H, 1.1 * H),
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        r,
+                        hue: HUE + rnd(-5, 6)
+                    });
+                }
+            }
+            spawn();
+
+            let last = performance.now();
+            function loop(now) {
+                const dt = Math.min(0.05, (now - last) / 1000); last = now;
+
+                // clear fully to avoid trail bloom (helps reduce perceived blur)
+                ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+                // slightly additive for glow but toned down with low alpha stops
+                ctx.globalCompositeOperation = 'lighter';
+
+                for (const o of orbs) {
+                    // autonomous drift
+                    o.x += o.vx * dt;
+                    o.y += o.vy * dt;
+
+                    // gentle curve drift to avoid linear paths
+                    const wobble = Math.sin((now * 0.001) + o.x * 0.0009 + o.y * 0.0007);
+                    o.vx += wobble * 0.02;
+                    o.vy -= wobble * 0.02;
+
+                    // speed clamp
+                    const sp = Math.hypot(o.vx, o.vy);
+                    const maxSp = SPEED * 1.2;
+                    if (sp > maxSp) {
+                        o.vx = o.vx / sp * maxSp;
+                        o.vy = o.vy / sp * maxSp;
+                    }
+
+                    // screen wrap
+                    const W = canvas.clientWidth, H = canvas.clientHeight;
+                    if (o.x < -o.r * 1.2) o.x = W + o.r * 1.2;
+                    if (o.x > W + o.r * 1.2) o.x = -o.r * 1.2;
+                    if (o.y < -o.r * 1.2) o.y = H + o.r * 1.2;
+                    if (o.y > H + o.r * 1.2) o.y = -o.r * 1.2;
+
+                    // draw: less blur → sharper core and faster alpha falloff
+                    const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
+                    grad.addColorStop(0.0, `hsla(${o.hue}, ${SATURATION}%, 88%, ${ALPHA})`);
+                    grad.addColorStop(0.18, `hsla(${o.hue}, ${SATURATION}%, 82%, ${ALPHA * 0.5})`);
+                    grad.addColorStop(0.38, `hsla(${o.hue}, ${SATURATION}%, 74%, ${ALPHA * 0.})`);
+                    grad.addColorStop(0.62, `hsla(${o.hue}, ${SATURATION}%, 66%, ${ALPHA * 0.})`);
+                    grad.addColorStop(1.0, `hsla(${o.hue}, ${SATURATION}%, 60%, 0)`);
+
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.globalCompositeOperation = 'source-over';
+                requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+
+            // handle resize
+            let to;
+            window.addEventListener('resize', () => {
+                clearTimeout(to); to = setTimeout(() => { resize(); spawn(); }, 150);
+            });
+        })();
+    </script>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCkO9zQf8Dx5M3db8RpH35o3-vUz16R6mk",
+            authDomain: "aluxbysolar23.firebaseapp.com",
+            projectId: "aluxbysolar23",
+            storageBucket: "aluxbysolar23.firebasestorage.app",
+            messagingSenderId: "978969467398",
+            appId: "1:978969467398:web:7da4c402084ef920b58187"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function loadGalleries() {
+            const querySnapshot = await getDocs(collection(db, "galleries"));
+            const temp = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                temp.push({
+                    src: data.cover,
+                    title: (data.title || '').toUpperCase(),
+                    slug: doc.id,
+                    sort: data.sort || 0
+                });
+            });
+
+            // 🔑 Ordina in base a "sort"
+            temp.sort((a, b) => a.sort - b.sort);
+
+            items = temp;
+
+            buildTrack();
+            slides = [...document.querySelectorAll('#slideshow .slide')];
+            imgs = [...document.querySelectorAll('#slideshow .media img')];
+            init();
+            requestUpdate();
+        }
+
+        loadGalleries().catch(console.error);
+    </script>
+
+
+</body>
+</html>

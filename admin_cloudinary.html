@@ -1,0 +1,778 @@
+﻿<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin – Cloudinary + Firestore</title>
+    <style>
+        :root {
+            --bg: #0e1116;
+            --fg: #eaf0ff;
+            --muted: #9aa3af;
+            --card: #151a23;
+            --border: #232a3a;
+            --accent: #7aa2ff;
+            --ok: #22c55e;
+            --err: #ff8a8a
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: linear-gradient(180deg,#0b0d12 0%,#0a0c10 100%);
+            color: var(--fg);
+            font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            background: #0b0d12cc;
+            backdrop-filter: blur(8px) saturate(140%);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 16px
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .row2 {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        button {
+            background: #101522;
+            color: var(--fg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 9px 12px;
+            font-weight: 700;
+            cursor: pointer
+        }
+
+            button.primary {
+                background: var(--accent);
+                color: #061023;
+                border-color: transparent
+            }
+
+            button.danger {
+                background: #31171a;
+                color: #ffb7b7;
+                border-color: #4c2227
+            }
+
+        main {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 16px;
+            padding: 16px
+        }
+
+        aside, section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden
+        }
+
+        .side-head {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center
+        }
+
+        .side-body {
+            padding: 8px;
+            max-height: 70vh;
+            overflow: auto
+        }
+
+        .tile {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 8px;
+            border-radius: 10px;
+            cursor: pointer
+        }
+
+            .tile:hover {
+                background: #182033
+            }
+
+            .tile.active {
+                background: #1a2236;
+                outline: 1px solid #2b3d63
+            }
+
+        .thumb {
+            width: 46px;
+            height: 46px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #0b0f18;
+            border: 1px solid #21283b;
+            display: grid;
+            place-items: center
+        }
+
+            .thumb img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover
+            }
+
+        .slug {
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(12,1fr);
+            gap: 12px;
+            padding: 12px
+        }
+
+        .card {
+            background: #101522;
+            border: 1px solid #1b2335;
+            border-radius: 12px;
+            padding: 12px
+        }
+
+        label {
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        input[type=text], input[type=number] {
+            width: 100%;
+            background: #0b0f18;
+            color: var(--fg);
+            border: 1px solid #1c2435;
+            border-radius: 10px;
+            padding: 9px 11px
+        }
+
+        .preview {
+            width: 100%;
+            max-width: 420px;
+            aspect-ratio: 16/9;
+            border: 1px dashed #2a3752;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+            background: #0b0f18
+        }
+
+            .preview img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover; /* o 'contain' se vuoi vederla intera senza tagli */
+            }
+
+
+        .images {
+            display: grid;
+            grid-template-columns: repeat(auto-fill,minmax(150px,1fr));
+            gap: 10px
+        }
+
+        .img {
+            border: 1px solid #1c2435;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #0b0f18
+        }
+
+            .img img {
+                width: 100%;
+                height: 130px;
+                object-fit: cover;
+                display: block
+            }
+
+        .bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 8px;
+            color: var(--muted);
+            font-size: 12px
+        }
+
+        .drag {
+            cursor: grab
+        }
+
+        .sticky {
+            position: fixed;
+            left: 336px;
+            right: 16px;
+            bottom: 16px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px
+        }
+
+        .msg {
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        .ok {
+            color: var(--ok)
+        }
+
+        .err {
+            color: var(--err)
+        }
+
+        .hidden {
+            display: none !important
+        }
+
+        /* Progress bars */
+        .progress {
+            width: 220px;
+            height: 8px;
+            background: #22283a;
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid #2a3552
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--accent);
+            transition: width .1s linear
+        }
+
+        @media (max-width:980px) {
+            main {
+                grid-template-columns: 1fr
+            }
+
+            .sticky {
+                left: 16px
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <strong>Benvenuto Pascal</strong>
+        <div class="row">
+            <span id="authState" class="msg">Verifica autenticazione…</span>
+            <button id="btnLogout" class="hidden">Logout</button>
+        </div>
+    </header>
+
+    <main>
+        <aside>
+            <div class="side-head">
+                <span>Gallerie</span>
+                <div class="row2">
+                    <button id="btnNew" class="primary">+ Nuova</button>
+                    <button id="btnRefresh">Aggiorna</button>
+                    <button id="btnDelete" class="danger hidden">Elimina</button>
+                </div>
+            </div>
+            <div id="list" class="side-body"></div>
+        </aside>
+
+        <section>
+            <div class="grid">
+                <div class="card" style="grid-column:span 6">
+                    <h3>Dettagli</h3>
+                    <div class="row">
+                        <div style="flex:1">
+                            <label>Slug (ID)</label>
+                            <input id="slug" type="text" placeholder="es. floreal-work">
+                        </div>
+                        <div style="width:140px">
+                            <label>Ordine (sort)</label>
+                            <input id="sort" type="number" value="0">
+                        </div>
+                    </div>
+                    <div class="row" style="margin-top:8px">
+                        <div style="flex:1">
+                            <label>Titolo</label>
+                            <input id="title" type="text" placeholder="Titolo visibile">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="grid-column:span 6">
+                    <h3>Cover Homepage</h3>
+                    <div id="coverPrev" class="preview"><span class="msg">Nessuna cover</span></div>
+                    <div class="row" style="margin-top:8px">
+                        <input id="coverFile" type="file" accept="image/*">
+                        <button id="uploadCover">Carica cover</button>
+                        <span id="coverMsg" class="msg"></span>
+                    </div>
+                    <!-- Barra progresso cover -->
+                    <div id="coverProg" class="progress hidden"><div class="progress-bar"></div></div>
+                    <div class="row" style="margin-top:8px">
+                        <div style="flex:1">
+                            <label>URL cover (salvato in Firestore)</label>
+                            <input id="cover" type="text" readonly placeholder="https://res.cloudinary.com/...">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="grid-column:span 12">
+                    <h3>Elementi galleria</h3>
+                    <div class="row">
+                        <input id="imagesFiles" type="file" accept="image/*" multiple>
+                        <button id="uploadImages">Carica selezionate</button>
+                        <button id="deleteChecked" class="danger">Elimina selezionate</button>
+                        <span id="imgsMsg" class="msg"></span>
+                    </div>
+                    <!-- Barra progresso immagini (batch) -->
+                    <div id="imgsProg" class="progress hidden"><div class="progress-bar"></div></div>
+                    <div id="images" class="images" style="margin-top:8px"></div>
+                </div>
+            </div>
+            <div class="sticky">
+                <span id="saveMsg" class="msg"></span>
+                <button id="save" class="primary">Salva</button>
+            </div>
+        </section>
+    </main>
+
+    <script type="module">
+        // 🔧 CONFIG — modifica queste due costanti per il tuo ambiente
+        const API_BASE = "https://alux-api.onrender.com/api/cloudinary"; // server.js locale che firma/cancella
+        const CLOUD_NAME = "dveeplkin"; // es: "demo" o il tuo cloud name da Dashboard
+
+        // Firebase (Auth + Firestore)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+        import { getFirestore, collection, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+        // 🔐 La tua config Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCkO9zQf8Dx5M3db8RpH35o3-vUz16R6mk",
+            authDomain: "aluxbysolar23.firebaseapp.com",
+            projectId: "aluxbysolar23",
+            storageBucket: "aluxbysolar23.firebasestorage.app",
+            messagingSenderId: "978969467398",
+            appId: "1:978969467398:web:7da4c402084ef920b58187"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // UI refs
+        const authState = document.getElementById('authState');
+        const btnLogout = document.getElementById('btnLogout');
+        const listEl = document.getElementById('list');
+        const btnNew = document.getElementById('btnNew');
+        const btnRefresh = document.getElementById('btnRefresh');
+        const btnDelete = document.getElementById('btnDelete');
+
+        const slug = document.getElementById('slug');
+        const sort = document.getElementById('sort');
+        const title = document.getElementById('title');
+
+        const coverFile = document.getElementById('coverFile');
+        const uploadCover = document.getElementById('uploadCover');
+        const cover = document.getElementById('cover');
+        const coverPrev = document.getElementById('coverPrev');
+        const coverMsg = document.getElementById('coverMsg');
+
+        const imagesFiles = document.getElementById('imagesFiles');
+        const uploadImages = document.getElementById('uploadImages');
+        const deleteChecked = document.getElementById('deleteChecked');
+        const imagesEl = document.getElementById('images');
+        const imgsMsg = document.getElementById('imgsMsg');
+
+        const save = document.getElementById('save');
+        const saveMsg = document.getElementById('saveMsg');
+
+        let currentId = null, currentRef = null;
+        // items = array di oggetti { url, id } (id = public_id Cloudinary)
+        let items = [];
+
+        // ---------- AUTH ----------
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                authState.textContent = `Loggato come ${user.email}`;
+                btnLogout.classList.remove('hidden');
+                loadList();
+            } else {
+                authState.textContent = 'Non autenticato – inserisci credenziali';
+                const email = prompt('Email admin:');
+                const pass = email ? prompt('Password:') : null;
+                if (email && pass) {
+                    signInWithEmailAndPassword(auth, email, pass).catch(err => alert('Login fallito: ' + (err.message || err.code)));
+                }
+                btnLogout.classList.add('hidden');
+            }
+        });
+        btnLogout.addEventListener('click', () => signOut(auth));
+
+        // ---------- LISTA ----------
+        async function loadList() {
+            listEl.innerHTML = '<div class="msg" style="padding:8px">Caricamento…</div>';
+            const q = query(collection(db, 'galleries'));
+            const snap = await getDocs(q);
+            const rows = [];
+            snap.forEach(d => {
+                const g = d.data();
+                rows.push({ id: d.id, title: g.title || d.id, cover: g.cover || '', sort: g.sort || 0 });
+            });
+            rows.sort((a, b) => (a.sort || 0) - (b.sort || 0) || a.title.localeCompare(b.title));
+            listEl.innerHTML = '';
+            rows.forEach(r => {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.dataset.id = r.id;
+                tile.innerHTML = `
+              <div class="thumb">${r.cover ? '<img src="' + r.cover + '" alt="">' : '<span class="msg">—</span>'}</div>
+              <div style="display:flex; flex-direction:column">
+                <strong>${r.title}</strong>
+                <span class="slug">/${r.id}</span>
+              </div>`;
+                tile.addEventListener('click', () => openGallery(r.id));
+                listEl.appendChild(tile);
+            });
+            btnDelete.classList.toggle('hidden', !currentId);
+        }
+
+        btnRefresh.addEventListener('click', loadList);
+        btnNew.addEventListener('click', () => {
+            clearEditor();
+            currentId = null; currentRef = null;
+            document.querySelectorAll('.tile').forEach(x => x.classList.remove('active'));
+            btnDelete.classList.add('hidden');
+        });
+
+        btnDelete.addEventListener('click', async () => {
+            if (!currentRef) return alert('Seleziona una galleria');
+            if (!confirm('Eliminare la galleria? (non elimina i file su Cloudinary)')) return;
+            await deleteDoc(currentRef);
+            clearEditor(); loadList();
+        });
+
+        async function openGallery(id) {
+            document.querySelectorAll('.tile').forEach(x => x.classList.remove('active'));
+            const tile = [...document.querySelectorAll('.tile')].find(x => x.dataset.id === id);
+            if (tile) tile.classList.add('active');
+
+            const ref = doc(db, 'galleries', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) { alert('Documento non trovato'); return; }
+            const g = snap.data();
+            currentId = id; currentRef = ref;
+            btnDelete.classList.remove('hidden');
+
+            slug.value = id; slug.disabled = true;
+            sort.value = g.sort || 0;
+            title.value = g.title || '';
+
+            cover.value = g.cover || '';
+            renderCover();
+
+            // items → normalizza a oggetti {url,id}
+            items = Array.isArray(g.items) ? g.items.map(it => {
+                if (typeof it === 'string') return { url: it, id: null };
+                return { url: it?.url || '', id: it?.id || null };
+            }) : [];
+            renderImages();
+        }
+
+        function clearEditor() {
+            slug.disabled = false; slug.value = '';
+            sort.value = 0; title.value = ''; cover.value = '';
+            items = []; imagesEl.innerHTML = '';
+            coverPrev.innerHTML = '<span class="msg">Nessuna cover</span>';
+            coverMsg.textContent = ''; imgsMsg.textContent = ''; saveMsg.textContent = '';
+            document.getElementById('coverProg').classList.add('hidden');
+            document.getElementById('imgsProg').classList.add('hidden');
+        }
+
+        function renderCover() {
+            const v = cover.value.trim();
+            coverPrev.innerHTML = v ? '<img src="' + v + '" alt="cover">' : '<span class="msg">Nessuna cover</span>';
+        }
+
+        // ---------- CLOUDINARY HELPERS ----------
+        function slugifyName(name) {
+            return name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-");
+        }
+        function publicIdForCover(s) { return `covers/${s}_home`; }
+        function publicIdForItem(s, filename) { return `galleries/${s}/${slugifyName(filename)}`; }
+
+        // 🔄 AUTOSAVE helpers
+        async function ensureDocExists(id) {
+            const ref = doc(db, 'galleries', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) {
+                await setDoc(ref, {
+                    title: (title.value || '').trim() || id,
+                    sort: Number(sort.value || 0) || 0,
+                    cover: '',
+                    coverId: null,
+                    items: []
+                });
+            }
+            currentRef = ref;
+            currentId = id;
+            slug.disabled = true;
+            return ref;
+        }
+
+        async function savePartial(id, fields) {
+            await ensureDocExists(id);
+            await updateDoc(currentRef, fields);
+            saveMsg.textContent = 'Salvato ✓';
+            saveMsg.className = 'msg ok';
+            setTimeout(() => { if (saveMsg.textContent === 'Salvato ✓') saveMsg.textContent = ''; }, 1200);
+        }
+
+        // Upload firmato con progresso XHR
+        async function signedUpload(file, public_id, onProgress) {
+            // 1) chiedi firma al server locale
+            const signRes = await fetch(`${API_BASE}/sign-upload`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ public_id, overwrite: 1, invalidate: 1 })
+            });
+            const sig = await signRes.json();
+            if (!signRes.ok || sig.error) throw new Error(sig.error || "sign failed");
+
+            // 2) prepara FormData
+            const form = new FormData();
+            form.append("file", file);
+            form.append("api_key", sig.api_key);
+            form.append("timestamp", sig.timestamp);
+            form.append("signature", sig.signature);
+            if (sig.public_id) form.append("public_id", sig.public_id);
+            if (sig.folder) form.append("folder", sig.folder);
+            form.append("overwrite", String(sig.overwrite));
+            form.append("invalidate", String(sig.invalidate));
+
+            // 3) upload a Cloudinary con XHR per avere onprogress
+            const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+
+            const out = await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open("POST", url);
+                xhr.onload = () => {
+                    try {
+                        const json = JSON.parse(xhr.responseText);
+                        if (xhr.status >= 200 && xhr.status < 300 && !json.error) resolve(json);
+                        else reject(new Error(json.error?.message || `upload failed (${xhr.status})`));
+                    } catch (e) { reject(e); }
+                };
+                xhr.onerror = () => reject(new Error("network error"));
+                if (xhr.upload && typeof onProgress === "function") {
+                    xhr.upload.onprogress = (e) => {
+                        if (e.lengthComputable) onProgress(e.loaded, e.total);
+                    };
+                }
+                xhr.send(form);
+            });
+
+            return out; // { secure_url, public_id, ... }
+        }
+
+        async function deleteCloudinary(public_id) {
+            const res = await fetch(`${API_BASE}/delete?public_id=${encodeURIComponent(public_id)}`, { method: "DELETE" });
+            const out = await res.json();
+            if (!res.ok || out.result !== "ok") throw new Error(out.error || "delete failed");
+            return true;
+        }
+
+        // ---------- COVER UPLOAD (autosave alla fine) ----------
+        uploadCover.addEventListener('click', async () => {
+            const id = (slug.value || '').trim();
+            if (!id) return alert('Imposta prima lo slug');
+            const f = coverFile.files[0];
+            if (!f) return alert('Seleziona un file');
+            try {
+                // barra
+                const barWrap = document.getElementById('coverProg');
+                const bar = barWrap.querySelector('.progress-bar');
+                barWrap.classList.remove('hidden');
+                bar.style.width = '0%';
+
+                const out = await signedUpload(f, publicIdForCover(id), (loaded, total) => {
+                    const pct = Math.max(0, Math.min(100, Math.round(loaded * 100 / total)));
+                    bar.style.width = pct + '%';
+                });
+
+                cover.value = out.secure_url;
+                cover.dataset.publicId = out.public_id;
+                renderCover();
+                coverMsg.textContent = 'Cover caricata ✓ (sovrascrive se ricarichi)';
+                coverMsg.className = 'msg ok';
+
+                // 🔄 AUTOSAVE cover al termine upload
+                await savePartial(id, {
+                    cover: (cover.value || '').trim(),
+                    coverId: cover.dataset.publicId || null,
+                    title: (title.value || '').trim() || id,
+                    sort: Number(sort.value || 0) || 0
+                });
+
+                setTimeout(() => barWrap.classList.add('hidden'), 400);
+            } catch (err) {
+                console.error(err);
+                coverMsg.textContent = 'Errore upload cover';
+                coverMsg.className = 'msg err';
+                document.getElementById('coverProg').classList.add('hidden');
+            }
+        });
+
+        // ---------- IMMAGINI: UPLOAD / RENDER / DELETE ----------
+        uploadImages.addEventListener('click', async () => {
+            const id = (slug.value || '').trim();
+            if (!id) return alert('Imposta prima lo slug');
+            const files = [...imagesFiles.files];
+            if (!files.length) return alert('Seleziona immagini');
+            try {
+                const barWrap = document.getElementById('imgsProg');
+                const bar = barWrap.querySelector('.progress-bar');
+                barWrap.classList.remove('hidden');
+                bar.style.width = '0%';
+
+                const totalBytes = files.reduce((sum, f) => sum + (f.size || 0), 0) || 1;
+                let uploadedBytes = 0;
+                let up = 0;
+
+                for (const f of files) {
+                    const before = uploadedBytes;
+                    const out = await signedUpload(f, publicIdForItem(id, f.name), (loaded, total) => {
+                        const current = before + loaded;
+                        const pct = Math.max(0, Math.min(100, Math.round(current * 100 / totalBytes)));
+                        bar.style.width = pct + '%';
+                    });
+                    uploadedBytes += (f.size || 0);
+                    items.push({ url: out.secure_url, id: out.public_id });
+                    up++;
+
+                    // 🔄 AUTOSAVE alla fine di OGNI upload di immagine
+                    await savePartial(id, {
+                        items: items.map(it => (typeof it === "string" ? { url: it, id: null } : it))
+                    });
+                }
+
+                imgsMsg.textContent = `Caricate ${up}/${files.length} ✓`;
+                imgsMsg.className = 'msg ok';
+                imagesFiles.value = '';
+                renderImages();
+
+                setTimeout(() => barWrap.classList.add('hidden'), 400);
+            } catch (err) {
+                console.error(err);
+                imgsMsg.textContent = 'Errore upload immagini';
+                imgsMsg.className = 'msg err';
+                document.getElementById('imgsProg').classList.add('hidden');
+            }
+        });
+
+        function renderImages() {
+            imagesEl.innerHTML = '';
+            items.forEach((it, i) => {
+                const url = typeof it === "string" ? it : it.url;
+                const el = document.createElement('div');
+                el.className = 'img';
+                el.draggable = true;
+                el.dataset.i = i;
+                el.innerHTML = `
+              <img src="${url}" alt="">
+              <div class="bar">
+                <label class="row" style="gap:6px"><input type="checkbox" data-k="${i}"> #${i + 1}</label>
+                <span class="drag">↕︎</span>
+              </div>`;
+                el.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', i.toString());
+                    el.classList.add('dragging');
+                });
+                el.addEventListener('dragend', () => el.classList.remove('dragging'));
+                el.addEventListener('dragover', (e) => e.preventDefault());
+                el.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const from = parseInt(e.dataTransfer.getData('text/plain'));
+                    const to = parseInt(el.dataset.i);
+                    if (isNaN(from) || isNaN(to) || from === to) return;
+                    const v = items.splice(from, 1)[0];
+                    items.splice(to, 0, v);
+                    renderImages();
+                    // (facoltativo) potremmo autosalvare anche il riordino:
+                    // savePartial(currentId, { items: items.map(x => typeof x === 'string' ? {url:x,id:null} : x) });
+                });
+                imagesEl.appendChild(el);
+            });
+        }
+
+        deleteChecked.addEventListener('click', async () => {
+            const checks = [...document.querySelectorAll('[data-k]')].filter(c => c.checked);
+            if (!checks.length) return alert('Seleziona elementi');
+            if (!confirm('Eliminare selezionati su Cloudinary e dai dati?')) return;
+            try {
+                const idxs = checks.map(c => parseInt(c.getAttribute('data-k'))).sort((a, b) => b - a);
+                for (const idx of idxs) {
+                    const it = items[idx];
+                    const publicId = (typeof it === "object" && it?.id) ? it.id : null;
+                    if (publicId) { await deleteCloudinary(publicId); }
+                    items.splice(idx, 1);
+                }
+                // 🔄 AUTOSAVE dopo eliminazione
+                await savePartial(currentId, {
+                    items: items.map(it => (typeof it === "string" ? { url: it, id: null } : it))
+                });
+
+                renderImages();
+            } catch (err) {
+                console.error(err);
+                alert('Errore durante eliminazione: ' + (err.message || err));
+            }
+        });
+
+        // ---------- SALVA MANUALE (rimane) ----------
+        save.addEventListener('click', async () => {
+            const id = (slug.value || '').trim();
+            if (!id) return alert('Slug obbligatorio');
+            const payload = {
+                title: (title.value || '').trim(),
+                cover: (cover.value || '').trim(),
+                coverId: cover.dataset.publicId || null,
+                items: items.map(it => (typeof it === "string" ? { url: it, id: null } : it)),
+                sort: Number(sort.value || 0)
+            };
+            try {
+                await ensureDocExists(id);
+                await updateDoc(currentRef, payload);
+                saveMsg.textContent = 'Salvato ✓'; saveMsg.className = 'msg ok';
+                loadList();
+            } catch (err) {
+                console.error(err);
+                saveMsg.textContent = 'Errore salvataggio'; saveMsg.className = 'msg err';
+            }
+        });
+    </script>
+</body>
+</html>
