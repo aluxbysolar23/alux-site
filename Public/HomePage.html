@@ -99,6 +99,8 @@
   .social{ display:flex; gap:75px }
   .social a{ width:52px;height:52px;border-radius:999px;display:grid;place-items:center;color:var(--fg);text-decoration:none;background:rgba(255,255,255,.08);transition:background .2s,transform .08s }
   .social a:hover{ background:rgba(255,255,255,.16) } .social a:active{ transform:scale(.95) }
+  .social b{ width:52px;height:52px;border-radius:999px;display:grid;place-items:center;color:var(--fg);text-decoration:none;background:rgba(255,255,255,.00);transition:background .2s,transform .08s }
+  
 
   @media (max-width: 640px){
     :root{ --base-w: 900px; --base-h: 490px; --slide-w: 650px; --edge-fade: 48px; }
@@ -176,7 +178,9 @@
         <div class="footer-inner">
             <div class="social">
                 <a href="https://www.instagram.com/lux.paskal" aria-label="Instagram">IG</a>
+              <div class="social b">
                 <a href="#" aria-label="X">-</a>
+              </div>
                 <a href="mailto:hello@example.com" aria-label="Email">✉</a>
             </div>
         </div>
