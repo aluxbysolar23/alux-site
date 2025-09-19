@@ -525,7 +525,13 @@
             return name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-");
         }
         function publicIdForCover(s) { return `covers/${s}_home`; }
-        function publicIdForItem(s, filename) { return `galleries/${s}/${slugifyName(filename)}`; }
+        function publicIdForItem(s, filename){
+          const base = slugifyName(filename).replace(/\.[a-z0-9]+$/i,'');
+          const ext  = (filename.match(/\.[a-z0-9]+$/i) || [''])[0];
+          const uniq = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7);
+          return `galleries/${s}/${base}__${uniq}${ext}`;
+        }
+
 
         // 🔄 AUTOSAVE helpers
         async function ensureDocExists(id) {
@@ -555,58 +561,67 @@
         }
 
         // Upload firmato con progresso XHR
-        async function signedUpload(file, public_id, onProgress) {
-            // 1) chiedi firma al server locale
-            const signRes = await fetch(`${API_BASE}/sign-upload`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ public_id, overwrite: 1, invalidate: 1 })
-            });
-            const sig = await signRes.json();
-            if (!signRes.ok || sig.error) throw new Error(sig.error || "sign failed");
+async function signedUpload(file, public_id, onProgress, options = {}){
+  const {
+    overwrite = 1,     // default compatibile (cover continua a sovrascrivere)
+    invalidate = 1,
+    folder = undefined
+  } = options;
 
-            // 2) prepara FormData
-            const form = new FormData();
-            form.append("file", file);
-            form.append("api_key", sig.api_key);
-            form.append("timestamp", sig.timestamp);
-            form.append("signature", sig.signature);
-            if (sig.public_id) form.append("public_id", sig.public_id);
-            if (sig.folder) form.append("folder", sig.folder);
-            form.append("overwrite", String(sig.overwrite));
-            form.append("invalidate", String(sig.invalidate));
+  const signRes = await fetch(`${API_BASE}/sign-upload`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeaders?.() || {}) },
+    body: JSON.stringify({ public_id, overwrite, invalidate, folder })
+  });
+  const sig = await signRes.json();
+  if(!signRes.ok || sig.error) throw new Error(sig.error || "sign failed");
 
-            // 3) upload a Cloudinary con XHR per avere onprogress
-            const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+  const form = new FormData();
+  form.append("file", file);
+  form.append("api_key", sig.api_key);
+  form.append("timestamp", sig.timestamp);
+  form.append("signature", sig.signature);
+  if (sig.public_id) form.append("public_id", sig.public_id);
+  if (sig.folder)    form.append("folder", sig.folder);
+  form.append("overwrite", String(sig.overwrite));
+  form.append("invalidate", String(sig.invalidate));
 
-            const out = await new Promise((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                xhr.open("POST", url);
-                xhr.onload = () => {
-                    try {
-                        const json = JSON.parse(xhr.responseText);
-                        if (xhr.status >= 200 && xhr.status < 300 && !json.error) resolve(json);
-                        else reject(new Error(json.error?.message || `upload failed (${xhr.status})`));
-                    } catch (e) { reject(e); }
-                };
-                xhr.onerror = () => reject(new Error("network error"));
-                if (xhr.upload && typeof onProgress === "function") {
-                    xhr.upload.onprogress = (e) => {
-                        if (e.lengthComputable) onProgress(e.loaded, e.total);
-                    };
-                }
-                xhr.send(form);
-            });
+  const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
 
-            return out; // { secure_url, public_id, ... }
+  const out = await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.onload = () => {
+      try {
+        const json = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300 && !json.error) resolve(json);
+        else reject(new Error(json.error?.message || `upload failed (${xhr.status})`));
+      } catch(e) { reject(e); }
+    };
+    xhr.onerror = () => reject(new Error("network error"));
+    if (xhr.upload && typeof onProgress === "function") {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded, e.total);
+      };
+    }
+    xhr.send(form);
+  });
+
+  return out;
+}
+
+
+        async function deleteCloudinary(public_id){
+          const res = await fetch(`${API_BASE}/delete?public_id=${encodeURIComponent(public_id)}`, {
+            method:"DELETE",
+            headers: { ...(await authHeaders?.() || {}) }
+          });
+          const out = await res.json();
+          if(!res.ok) throw new Error(out.error || "delete failed");
+          if(out.result === "ok" || out.result === "not found") return true;
+          return true;
         }
 
-        async function deleteCloudinary(public_id) {
-            const res = await fetch(`${API_BASE}/delete?public_id=${encodeURIComponent(public_id)}`, { method: "DELETE" });
-            const out = await res.json();
-            if (!res.ok || out.result !== "ok") throw new Error(out.error || "delete failed");
-            return true;
-        }
 
         // ---------- COVER UPLOAD (autosave alla fine) ----------
         uploadCover.addEventListener('click', async () => {
@@ -621,10 +636,17 @@
                 barWrap.classList.remove('hidden');
                 bar.style.width = '0%';
 
-                const out = await signedUpload(f, publicIdForCover(id), (loaded, total) => {
-                    const pct = Math.max(0, Math.min(100, Math.round(loaded * 100 / total)));
+                const out = await signedUpload(
+                  f,
+                  publicIdForItem(id, f.name),
+                  (loaded, total) => {
+                    const current = before + loaded;
+                    const pct = Math.max(0, Math.min(100, Math.round(current * 100 / totalBytes)));
                     bar.style.width = pct + '%';
-                });
+                  },
+                  { overwrite: 0, invalidate: 0 }  // ← consenti duplicati su Cloudinary
+                );
+
 
                 cover.value = out.secure_url;
                 cover.dataset.publicId = out.public_id;
@@ -779,6 +801,7 @@
     </script>
 </body>
 </html>
+
 
 
 
