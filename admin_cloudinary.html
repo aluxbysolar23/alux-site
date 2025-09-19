@@ -386,6 +386,14 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // Aggiunge l'header Authorization con l'ID token Firebase dell'utente loggato
+        async function authHeaders() {
+          const user = auth.currentUser;
+          const token = user ? await user.getIdToken() : "";
+          return token ? { Authorization: `Bearer ${token}` } : {};
+        }
+
+
         // UI refs
         const authState = document.getElementById('authState');
         const btnLogout = document.getElementById('btnLogout');
@@ -801,6 +809,7 @@ async function signedUpload(file, public_id, onProgress, options = {}){
     </script>
 </body>
 </html>
+
 
 
 
